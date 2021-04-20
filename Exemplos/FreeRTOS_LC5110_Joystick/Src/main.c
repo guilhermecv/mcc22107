@@ -64,11 +64,21 @@ void vTask_Nr_Print(void *pvParameters)
 		escreve_Nr_Peq(10,20, valor_ADC[0], 10);
 		escreve_Nr_Peq(10,30, valor_ADC[1], 10);
 		goto_XY(0,0);
-		string_LCD_Nr("Nr=", rand_prng, 10);			// escreve uma mensagem com um número
+		string_LCD_Nr("Nr=", rand_prng, 10);			// escreve uma mensagem com um nï¿½mero
 
-		vTaskDelay(500);
+		vTaskDelay(100);
 	}
 }
+
+void LED_Task(void *pvParameters)
+{
+	while(1)
+	{
+		HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
+		vTaskDelay(500/portTICK_RATE_MS);
+	}
+}
+
 //---------------------------------------------------------------------------------------------------
 /* USER CODE END 0 */
 
@@ -121,14 +131,16 @@ int main(void)
 	string_LCD("Press.  Botao");
 	imprime_LCD();
 
+//	vTaskDelay(2000/portTICK_RATE_MS);
+
 	while(HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_15)) // enquando nao pressionar joystick fica travado
 	{
-		semente_PRNG++;		// semente para o gerador de números pseudoaleatorios
+		semente_PRNG++;		// semente para o gerador de nï¿½meros pseudoaleatorios
 							// pode ser empregado o ADC lendo uma entrada flutuante para gerar a semente.
 	}
 
 	init_LFSR(semente_PRNG);	// inicializacao para geracao de numeros pseudoaleatorios
-	//rand_prng = prng_LFSR();	// sempre q a funcao prng() for chamada um novo nr é gerado.
+	//rand_prng = prng_LFSR();	// sempre q a funcao prng() for chamada um novo nr ï¿½ gerado.
 
 	limpa_LCD();
 	escreve2fb((unsigned char *)dragon);
@@ -159,6 +171,8 @@ int main(void)
 	/* USER CODE BEGIN RTOS_THREADS */
 	xTaskCreate(vTask_LCD_Print, "Task 1", 100, NULL, 1,NULL);
 	xTaskCreate(vTask_Nr_Print, "Task 2", 100, NULL, 1,NULL);
+	xTaskCreate(LED_Task, "LED", 100, NULL, 1, NULL);
+
 	/* USER CODE END RTOS_THREADS */
 
 	/* USER CODE BEGIN RTOS_QUEUES */
