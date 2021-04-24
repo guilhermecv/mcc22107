@@ -9,6 +9,7 @@
 
 //#define INVERT_COLOR
 #define LCD_MODEL_0			// 0 - Modelo Vermelho, 1 - Modelo Azul
+#define FONT_SMALL
 
 //-------------------------------------------------------------------------------------
 // RST (A7)

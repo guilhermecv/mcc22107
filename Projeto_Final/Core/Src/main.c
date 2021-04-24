@@ -9,6 +9,7 @@
 #include "NOKIA5110_fb.h"
 #include "figuras.h"
 #include "PRNG_LFSR.h"
+
 /* USER CODE END Includes */
 
 /* Private variables ---------------------------------------------------------*/
@@ -50,47 +51,142 @@ void vTask_LCD_Print(void *pvParameters) {
 		imprime_LCD();
 }
 
-void draw_screen(void)
-{
-	uint32_t lifes = 3;
-	struct pontos_t pontos;
-	pontos.x1 = 0;
-	pontos.y1 = 8;
-	pontos.x2 = 100;
-	pontos.y2 = 8;
-
-	desenha_linha(&pontos, 1);
-	goto_XY(1, 0);
-	string_LCD("Level");
-	goto_XY(70, 0);
-	string_LCD("L");
-	escreve_Nr_Peq(73, 1, lifes, 2);
-}
-
 //---------------------------------------------------------------------------------------------------
 // Tarefa para imprimir um numero aleatorio
+
 void vTask_Nr_Print(void *pvParameters) {
+
 	uint32_t rand_prng;
-/*
 
 	while (1) {
 		rand_prng = prng_LFSR();
-//		escreve_Nr_Peq(10,10, rand_prng, 10);
-		escreve_Nr_Peq(40,30, valor_ADC[0], 10);
-		escreve_Nr_Peq(40,40, valor_ADC[1], 10);
-		goto_XY(25,0);
-		string_LCD_Nr("Nr=", rand_prng, 10);			// escreve uma mensagem com um n�mero
-
-		vTaskDelay(200);
-	}
-*/
-
-	while(1)
-	{
+		//		escreve_Nr_Peq(10,10, rand_prng, 10);
+		escreve_Nr_Peq(10, 20, valor_ADC[0], 10);
+		escreve_Nr_Peq(10, 30, valor_ADC[1], 10);
 		goto_XY(0, 0);
-		string_LCD("T");
+		string_LCD_Nr("Nr=", rand_prng, 10); // escreve uma mensagem com um n�mero
+
 		vTaskDelay(200);
 	}
+}
+
+uint32_t x[50];
+uint32_t y[50];
+uint32_t temp_x;
+uint32_t temp_y;
+uint32_t xx;
+uint32_t yy;
+uint32_t speed_delay = 500;
+uint32_t score = 0;
+
+uint32_t snake_length = 4;
+uint32_t move_direction;
+
+enum{
+	STOP,
+	LEFT,
+	RIGHT,
+	UP,
+	DOWN,
+}movement_position;
+
+void draw_screen(void)
+{
+	struct pontos_t screen;
+
+	screen.x1 = 0;
+	screen.y1 = 7;
+	screen.x2 = 83;
+	screen.y2 = 47;
+
+	desenha_retangulo(&screen, 1);
+	escreve_Nr_Peq(10, 0, score, 10);
+}
+
+void move_snake(void) {
+	uint32_t i;
+
+	for (i = 0; i < snake_length; i++) {
+		xx = x[i];
+		yy = y[i];
+		x[i] = temp_x;
+		y[i] = temp_y;
+		temp_x = xx;
+		temp_y = yy;
+	}
+
+	limpa_LCD();
+	draw_screen();
+	//desenha_circulo(x[0], y[0], 1, 1);
+	//desenha_circulo(x[snake_length], y[snake_length], 1, 1);
+
+	for (i = 0; i < snake_length; i++) {
+		desenha_circulo(x[i], y[i], 1, 1);
+	}
+}
+
+void check_movement(void) {
+	if (valor_ADC[0] < 20) {
+		move_direction = LEFT;
+		
+	}
+	if (valor_ADC[0] > 3400) {
+		move_direction = RIGHT;
+		
+	}
+	if (valor_ADC[1] < 20) {
+		move_direction = UP;
+
+	}
+	if (valor_ADC[1] > 3400) {
+		move_direction = DOWN;
+	}
+
+	switch(move_direction)
+	{
+		case LEFT:
+			temp_x = x[0] - 3;
+			temp_y = y[0];
+			break;
+
+		case RIGHT:
+			temp_x = x[0] + 3;
+			temp_y = y[0];
+			break;
+
+		case UP:
+			temp_x = x[0];
+			temp_y = y[0] + 3;
+			break;
+
+		case DOWN:
+			temp_x = x[0];
+			temp_y = y[0] - 3;
+			break;
+	}
+}
+
+void vTask_Game(void *pvParameters) {
+	uint32_t i;
+
+	for (i = 0; i < snake_length; i++) {
+		x[i] = 25 - 3 * i;
+		y[i] = 30;
+	}
+	for (i = 0; i < snake_length; i++) {
+		desenha_circulo(x[i], y[i], 1, 1);
+	}
+
+	move_direction = RIGHT;
+
+	while (1) {
+
+		check_movement();
+		move_snake();
+
+		vTaskDelay(speed_delay/ portTICK_RATE_MS);
+	}
+
 }
 
 void LED_Task(void *pvParameters) {
@@ -102,7 +198,6 @@ void LED_Task(void *pvParameters) {
 
 //---------------------------------------------------------------------------------------------------
 /* USER CODE END 0 */
-
 
 /**
  * @brief  The application entry point.
@@ -144,11 +239,15 @@ int main(void) {
 	// inicializa LCD 5110
 	inic_LCD();
 	limpa_LCD();
+	escreve2fb((unsigned char*) inicial_2);
 
+	imprime_LCD();
+	HAL_Delay(5000);
+	limpa_LCD();
 	// --------------------------------------------------------------------------------------
 	// inicializa tela
 
-	goto_XY(35, 0);
+	goto_XY(0, 0);
 	string_LCD("Press.  Botao");
 	imprime_LCD();
 
@@ -163,11 +262,6 @@ int main(void) {
 	init_LFSR(semente_PRNG);// inicializacao para geracao de numeros pseudoaleatorios
 	//rand_prng = prng_LFSR();	// sempre q a funcao prng() for chamada um novo nr � gerado.
 
-	limpa_LCD();
-	goto_XY(35, 0);
-	escreve2fb((unsigned char*) dragon);
-	imprime_LCD();
-	HAL_Delay(2000);
 	limpa_LCD();
 	imprime_LCD();
 
@@ -191,7 +285,10 @@ int main(void) {
 	// defaultTaskHandle = osThreadCreate(osThread(defaultTask), NULL);
 	/* USER CODE BEGIN RTOS_THREADS */
 	xTaskCreate(vTask_LCD_Print, "Task 1", 100, NULL, 1, NULL);
-	xTaskCreate(vTask_Nr_Print, "Task 2", 100, NULL, 1, NULL);
+
+	xTaskCreate(vTask_Game, "Game Task", 500, NULL, 1, NULL);
+
+	//xTaskCreate(vTask_Nr_Print, "Task 2", 500, NULL, 1, NULL);
 	xTaskCreate(LED_Task, "LED", 100, NULL, 1, NULL);
 
 	/* USER CODE END RTOS_THREADS */
@@ -309,7 +406,7 @@ static void MX_ADC1_Init(void) {
 
 }
 
-/** 
+/**
  * Enable DMA controller clock
  */
 static void MX_DMA_Init(void) {
@@ -323,7 +420,7 @@ static void MX_DMA_Init(void) {
 
 }
 
-/** Configure pins as 
+/** Configure pins as
  * Analog
  * Input
  * Output
@@ -344,7 +441,7 @@ static void MX_GPIO_Init(void) {
 
 	/*Configure GPIO pin Output Level */
 	HAL_GPIO_WritePin(GPIOA,
-			GPIO_PIN_3 | GPIO_PIN_4 | GPIO_PIN_5 | GPIO_PIN_6 | GPIO_PIN_7,
+	GPIO_PIN_3 | GPIO_PIN_4 | GPIO_PIN_5 | GPIO_PIN_6 | GPIO_PIN_7,
 			GPIO_PIN_RESET);
 
 	/*Configure GPIO pin : PC13 */
