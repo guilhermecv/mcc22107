@@ -70,12 +70,20 @@ void vTask_Nr_Print(void *pvParameters) {
 	}
 }
 
-uint32_t x[50];
-uint32_t y[50];
+#define X_LIMIT_LEFT		1
+#define X_LIMIT_RIGHT		82
+#define Y_LIMIT_UP 			9
+#define Y_LIMIT_DOWN		46
+#define MAX_SNAKE_LENGTH	30
+
+uint32_t x[MAX_SNAKE_LENGTH];
+uint32_t y[MAX_SNAKE_LENGTH];
 uint32_t temp_x;
 uint32_t temp_y;
-uint32_t xx;
-uint32_t yy;
+uint32_t x_swap;
+uint32_t y_swap;
+uint32_t food_x;
+uint32_t food_y;
 uint32_t speed_delay = 500;
 uint32_t score = 0;
 
@@ -90,6 +98,11 @@ enum{
 	DOWN,
 }movement_position;
 
+/**
+ * @brief
+ * @param
+ * @retval
+ */
 void draw_screen(void)
 {
 	struct pontos_t screen;
@@ -99,48 +112,123 @@ void draw_screen(void)
 	screen.x2 = 83;
 	screen.y2 = 47;
 
+	goto_XY(0,0);
+	string_LCD_Nr("score ", score, 3);
 	desenha_retangulo(&screen, 1);
-	escreve_Nr_Peq(10, 0, score, 10);
+	desenha_circulo(food_x, food_y, 1, 1);
+	//escreve_Nr_Peq(10, 0, score, 10);
+
 }
 
+/**
+ * @brief
+ * @param
+ * @retval
+ */
+void create_food(void)
+{
+	uint32_t rand_prng = prng_LFSR();
+	
+	food_x = rand_prng & (0x00000053 | 0x00000005);		// Limita o valor entre 1 e 83
+	food_y = rand_prng & (0x0000002F | 0x00000009);		// Limita o valor entre 7 e 47
+
+
+}
+
+/**
+ * @brief
+ * @param
+ * @retval
+ */
+void check_colision(void)
+{
+	uint32_t i;
+
+	// Colisão com a parede ou com o próprio corpo
+	//for(i = 0; i < snake_length; i++)
+	//{
+		if( (x[0] <= X_LIMIT_LEFT || x[0] >= X_LIMIT_RIGHT) || (y[0] <= Y_LIMIT_UP || y[0] >= Y_LIMIT_DOWN))
+		{
+
+			limpa_LCD();
+			escreve2fb((unsigned char*) game_over);
+			imprime_LCD();
+/*
+			goto_XY(10, 10);
+			string_LCD("GAME");
+			goto_XY(10, 20);
+			string_LCD("GAME OVER");
+*/
+			while(1);
+		}
+	//}
+}
+
+/**
+ * @brief
+ * @param
+ * @retval
+ */
+void check_food_colision(void)
+{
+	if(x[0] == food_x)
+	{
+		if(y[0] == food_y)
+		{
+			score++;
+			snake_length++;
+			//speed_delay-= 50;
+
+			// Apaga o círculo antigo e gera outro
+			desenha_circulo(food_x, food_y, 1, 0);
+			create_food();
+		}
+	}
+}
+
+/**
+ * @brief
+ * @param
+ * @retval
+ */
 void move_snake(void) {
 	uint32_t i;
 
 	for (i = 0; i < snake_length; i++) {
-		xx = x[i];
-		yy = y[i];
+		x_swap = x[i];
+		y_swap = y[i];
 		x[i] = temp_x;
 		y[i] = temp_y;
-		temp_x = xx;
-		temp_y = yy;
+		temp_x = x_swap;
+		temp_y = y_swap;
 	}
 
 	limpa_LCD();
 	draw_screen();
-	//desenha_circulo(x[0], y[0], 1, 1);
-	//desenha_circulo(x[snake_length], y[snake_length], 1, 1);
 
 	for (i = 0; i < snake_length; i++) {
 		desenha_circulo(x[i], y[i], 1, 1);
 	}
 }
 
-void check_movement(void) {
-	if (valor_ADC[0] < 20) {
+/**
+ * @brief
+ * @param
+ * @retval
+ */
+void check_movement(void) 
+{
+	if (valor_ADC[0] < 20) 
+		move_direction = RIGHT;
+
+	if (valor_ADC[0] > 3400) 
 		move_direction = LEFT;
 		
-	}
-	if (valor_ADC[0] > 3400) {
-		move_direction = RIGHT;
-		
-	}
-	if (valor_ADC[1] < 20) {
-		move_direction = UP;
-
-	}
-	if (valor_ADC[1] > 3400) {
+	if (valor_ADC[1] < 20) 
 		move_direction = DOWN;
-	}
+
+	if (valor_ADC[1] > 3400) 
+		move_direction = UP;
 
 	switch(move_direction)
 	{
@@ -166,8 +254,17 @@ void check_movement(void) {
 	}
 }
 
+/**
+ * @brief
+ * @param
+ * @retval
+ */
 void vTask_Game(void *pvParameters) {
 	uint32_t i;
+
+	// Cria a primeira comida
+	food_x = 10;
+	food_y = 15;
 
 	for (i = 0; i < snake_length; i++) {
 		x[i] = 25 - 3 * i;
@@ -181,14 +278,21 @@ void vTask_Game(void *pvParameters) {
 
 	while (1) {
 
+		check_colision();
+		check_food_colision();
 		check_movement();
 		move_snake();
-
+		
 		vTaskDelay(speed_delay/ portTICK_RATE_MS);
 	}
 
 }
 
+/**
+ * @brief
+ * @param
+ * @retval
+ */
 void LED_Task(void *pvParameters) {
 	while (1) {
 		HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
@@ -239,16 +343,19 @@ int main(void) {
 	// inicializa LCD 5110
 	inic_LCD();
 	limpa_LCD();
-	escreve2fb((unsigned char*) inicial_2);
+	escreve2fb((unsigned char*) snake);
 
 	imprime_LCD();
 	HAL_Delay(5000);
 	limpa_LCD();
-	// --------------------------------------------------------------------------------------
-	// inicializa tela
 
+/*
 	goto_XY(0, 0);
 	string_LCD("Press.  Botao");
+	imprime_LCD();
+*/
+	limpa_LCD();
+	escreve2fb((unsigned char*) press_button);
 	imprime_LCD();
 
 //	vTaskDelay(2000/portTICK_RATE_MS);
