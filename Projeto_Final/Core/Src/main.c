@@ -69,7 +69,7 @@ uint32_t speed_delay = 500;
 uint32_t score = 0;
 
 uint32_t snake_length = 6;
-uint32_t move_direction;
+
 
 enum{
 	STOP,
@@ -78,6 +78,13 @@ enum{
 	UP,
 	DOWN,
 }movement_position;
+
+
+
+xQueueHandle movement_queue;
+
+#define MOVEMENT_QUEUE_SIZE		1
+#define MOVEMENT_QUEUE_LENGTH	5
 
 /**
  * @brief Atualiza os desenhos na tela
@@ -215,6 +222,7 @@ void move_snake(void) {
  */
 void check_movement(void) 
 {
+	/*
 	if (valor_ADC[0] < 20) 
 		move_direction = RIGHT;
 
@@ -226,6 +234,9 @@ void check_movement(void)
 
 	if (valor_ADC[1] > 3400) 
 		move_direction = UP;
+*/
+	uint32_t move_direction;
+	xQueueReceive(movement_queue, &move_direction, 20);
 
 	switch(move_direction)
 	{
@@ -251,6 +262,26 @@ void check_movement(void)
 	}
 }
 
+
+void vTask_Joystick(void *pvParameters)
+{
+	uint32_t move_direction = RIGHT;
+
+	while(1)
+	{
+		if (valor_ADC[0] < 20) 
+			move_direction = RIGHT;
+		if (valor_ADC[0] > 3400) 
+			move_direction = LEFT;
+		if (valor_ADC[1] < 20) 
+			move_direction = DOWN;
+		if (valor_ADC[1] > 3400) 
+			move_direction = UP;
+
+		xQueueSend(movement_queue, &move_direction, 10);
+	}
+}
+
 /**
  * @brief Tarefa principal do jogo
  * @param *pvParameters: Parâmetros passados para a função
@@ -273,12 +304,12 @@ void vTask_Game(void *pvParameters) {
 		vTaskDelay(150/portTICK_RATE_MS);
 	}
 
-	move_direction = RIGHT;		// Inicia o movimento da cobra
+	//move_direction = RIGHT;		// Inicia o movimento da cobra
 
 	//vTaskDelay(1000/portTICK_RATE_MS);
 
 	while (1) {
-		check_colision();
+		//check_colision();
 		check_food_colision();
 		check_movement();
 		move_snake();
@@ -344,21 +375,11 @@ int main(void) {
 	inic_LCD();
 	limpa_LCD();
 	escreve2fb((unsigned char*) snake);
-
 	imprime_LCD();
 	HAL_Delay(1200);
 	limpa_LCD();
-
-/*
-	goto_XY(0, 0);
-	string_LCD("Press.  Botao");
-	imprime_LCD();
-*/
-	limpa_LCD();
 	escreve2fb((unsigned char*) press_button);
 	imprime_LCD();
-
-//	vTaskDelay(2000/portTICK_RATE_MS);
 
 	while (HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_15)) // enquando nao pressionar joystick fica travado
 	{
@@ -394,12 +415,14 @@ int main(void) {
 	
 	xTaskCreate(vTask_LCD_Print, "Task 1", 100, NULL, 1, NULL);
 	xTaskCreate(vTask_Game, "Game Task", 500, NULL, 1, NULL);
+	xTaskCreate(vTask_Joystick, "Joystick Task", 100, NULL, 1, NULL);
 	xTaskCreate(LED_Task, "LED", 100, NULL, 1, NULL);
 
 	/* USER CODE END RTOS_THREADS */
 
 	/* USER CODE BEGIN RTOS_QUEUES */
 	/* add queues, ... */
+	movement_queue = xQueueCreate(1 ,4);
 	/* USER CODE END RTOS_QUEUES */
 
 	/* Start scheduler */
