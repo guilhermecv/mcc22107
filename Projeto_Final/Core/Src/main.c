@@ -29,7 +29,6 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_DMA_Init(void);
 static void MX_ADC1_Init(void);
-//void StartDefaultTask(void const * argument);
 
 /* USER CODE BEGIN PFP */
 /* Private function prototypes -----------------------------------------------*/
@@ -52,24 +51,6 @@ void vTask_LCD_Print(void *pvParameters) {
 }
 
 //---------------------------------------------------------------------------------------------------
-// Tarefa para imprimir um numero aleatorio
-
-void vTask_Nr_Print(void *pvParameters) {
-
-	uint32_t rand_prng;
-
-	while (1) {
-		rand_prng = prng_LFSR();
-		//		escreve_Nr_Peq(10,10, rand_prng, 10);
-		escreve_Nr_Peq(10, 20, valor_ADC[0], 10);
-		escreve_Nr_Peq(10, 30, valor_ADC[1], 10);
-		goto_XY(0, 0);
-		string_LCD_Nr("Nr=", rand_prng, 10); // escreve uma mensagem com um n�mero
-
-		vTaskDelay(200);
-	}
-}
-
 #define X_LIMIT_LEFT		1
 #define X_LIMIT_RIGHT		82
 #define Y_LIMIT_UP 			9
@@ -87,7 +68,7 @@ uint32_t food_y;
 uint32_t speed_delay = 500;
 uint32_t score = 0;
 
-uint32_t snake_length = 4;
+uint32_t snake_length = 6;
 uint32_t move_direction;
 
 enum{
@@ -99,9 +80,9 @@ enum{
 }movement_position;
 
 /**
- * @brief
- * @param
- * @retval
+ * @brief Atualiza os desenhos na tela
+ * 
+ * @retval 
  */
 void draw_screen(void)
 {
@@ -114,24 +95,46 @@ void draw_screen(void)
 
 	goto_XY(0,0);
 	string_LCD_Nr("score ", score, 3);
-	desenha_retangulo(&screen, 1);
-	desenha_circulo(food_x, food_y, 1, 1);
-	//escreve_Nr_Peq(10, 0, score, 10);
-
+	desenha_retangulo(&screen, 1);				// Desenha os limites da tela
+	desenha_circulo(food_x, food_y, 1, 1); 		// Desenha a comida
 }
 
 /**
- * @brief
+ * @brief Gera uma nova comida em uma posição aleatória
  * @param
  * @retval
  */
 void create_food(void)
 {
 	uint32_t rand_prng = prng_LFSR();
-	
+/*	
 	food_x = rand_prng & (0x00000053 | 0x00000005);		// Limita o valor entre 1 e 83
 	food_y = rand_prng & (0x0000002F | 0x00000009);		// Limita o valor entre 7 e 47
 
+	// Se a posição da comida estiver fora dos limites, gera outro valor
+	while(food_x <= 3 || food_x >= 85)
+	{
+		food_x = rand_prng & (0x00000053 | 0x00000005);
+	}
+
+
+	while(food_y <= 9 || food_y >= 45)
+	{
+		food_y = rand_prng & (0x0000002F | 0x00000009);
+	}
+*/	
+
+	do 
+	{
+		rand_prng = prng_LFSR();
+		food_x = rand_prng & (0x00000053 | 0x00000005);
+	} while(food_x < 2 || food_x > 79);
+
+	do
+	{
+		rand_prng = prng_LFSR();
+		food_y = rand_prng & (0x0000002F | 0x00000009);
+	} while(food_y < 10 || food_y > 42);
 
 }
 
@@ -145,23 +148,17 @@ void check_colision(void)
 	uint32_t i;
 
 	// Colisão com a parede ou com o próprio corpo
-	//for(i = 0; i < snake_length; i++)
-	//{
-		if( (x[0] <= X_LIMIT_LEFT || x[0] >= X_LIMIT_RIGHT) || (y[0] <= Y_LIMIT_UP || y[0] >= Y_LIMIT_DOWN))
+	for(i = 1; i < snake_length; i++)
+	{
+		if( (x[0] <= X_LIMIT_LEFT || x[0] >= X_LIMIT_RIGHT) || (y[0] <= Y_LIMIT_UP || y[0] >= Y_LIMIT_DOWN) || (x[i] == x[0] && y[i] == y[0]))
 		{
 
 			limpa_LCD();
 			escreve2fb((unsigned char*) game_over);
 			imprime_LCD();
-/*
-			goto_XY(10, 10);
-			string_LCD("GAME");
-			goto_XY(10, 20);
-			string_LCD("GAME OVER");
-*/
 			while(1);
 		}
-	//}
+	}
 }
 
 /**
@@ -171,9 +168,9 @@ void check_colision(void)
  */
 void check_food_colision(void)
 {
-	if(x[0] == food_x)
+	if(x[0] == food_x || x[0] == food_x + 1 || x[0] == food_x + 2 || x[0] == food_x - 1)
 	{
-		if(y[0] == food_y)
+		if(y[0] == food_y || y[0] == food_y + 1 || y[0] == food_y + 2 || y[0] == food_y - 1)
 		{
 			score++;
 			snake_length++;
@@ -187,7 +184,7 @@ void check_food_colision(void)
 }
 
 /**
- * @brief
+ * @brief Controla o movimento da cobra
  * @param
  * @retval
  */
@@ -212,7 +209,7 @@ void move_snake(void) {
 }
 
 /**
- * @brief
+ * @brief Verifica os valores do ADC e aplica o movimento
  * @param
  * @retval
  */
@@ -255,9 +252,9 @@ void check_movement(void)
 }
 
 /**
- * @brief
- * @param
- * @retval
+ * @brief Tarefa principal do jogo
+ * @param *pvParameters: Parâmetros passados para a função
+ * @retval nenhum
  */
 void vTask_Game(void *pvParameters) {
 	uint32_t i;
@@ -266,18 +263,21 @@ void vTask_Game(void *pvParameters) {
 	food_x = 10;
 	food_y = 15;
 
+	draw_screen();
 	for (i = 0; i < snake_length; i++) {
 		x[i] = 25 - 3 * i;
 		y[i] = 30;
 	}
 	for (i = 0; i < snake_length; i++) {
 		desenha_circulo(x[i], y[i], 1, 1);
+		vTaskDelay(150/portTICK_RATE_MS);
 	}
 
-	move_direction = RIGHT;
+	move_direction = RIGHT;		// Inicia o movimento da cobra
+
+	//vTaskDelay(1000/portTICK_RATE_MS);
 
 	while (1) {
-
 		check_colision();
 		check_food_colision();
 		check_movement();
@@ -346,7 +346,7 @@ int main(void) {
 	escreve2fb((unsigned char*) snake);
 
 	imprime_LCD();
-	HAL_Delay(5000);
+	HAL_Delay(1200);
 	limpa_LCD();
 
 /*
@@ -391,11 +391,9 @@ int main(void) {
 	// osThreadDef(defaultTask, StartDefaultTask, osPriorityNormal, 0, 128);
 	// defaultTaskHandle = osThreadCreate(osThread(defaultTask), NULL);
 	/* USER CODE BEGIN RTOS_THREADS */
+	
 	xTaskCreate(vTask_LCD_Print, "Task 1", 100, NULL, 1, NULL);
-
 	xTaskCreate(vTask_Game, "Game Task", 500, NULL, 1, NULL);
-
-	//xTaskCreate(vTask_Nr_Print, "Task 2", 500, NULL, 1, NULL);
 	xTaskCreate(LED_Task, "LED", 100, NULL, 1, NULL);
 
 	/* USER CODE END RTOS_THREADS */
